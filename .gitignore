@@ -1,0 +1,14 @@
+# Build artifacts
+/target/
+
+# BMAD generated output (artifacts, drafts, logs)
+/_bmad-output/
+
+# Local secrets/state
+.env
+**/*.key
+**/*.pem
+**/credentials.json
+
+# OS/editor
+.DS_Store

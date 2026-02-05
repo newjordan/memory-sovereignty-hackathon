@@ -1,0 +1,20 @@
+[package]
+name = "memsovereign-cli"
+description = "CLI for memsovereign"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "memsovereign"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+rand_core.workspace = true
+sha2.workspace = true
+mime_guess.workspace = true
+memsovereign = { path = "../memsovereign" }
