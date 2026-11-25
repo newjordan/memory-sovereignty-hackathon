@@ -1,20 +1,19 @@
 use memsovereign::types::Provenance;
-use rand_core::OsRng;
 
 #[test]
 fn init_creates_keys_and_refuses_overwrite_without_force() {
     let td = tempfile::tempdir().unwrap();
     let home = td.path();
 
-    let res = memsovereign::init_keys(home, false, OsRng).unwrap();
+    let res = memsovereign::init_keys(home, false, &mut memsovereign::os_rng()).unwrap();
     assert!(res.pubkey_fingerprint.len() > 5);
 
     // Second init should fail without --force.
-    let err = memsovereign::init_keys(home, false, OsRng).unwrap_err();
+    let err = memsovereign::init_keys(home, false, &mut memsovereign::os_rng()).unwrap_err();
     assert!(format!("{err:#}").contains("keys already exist"));
 
     // With --force it should succeed.
-    memsovereign::init_keys(home, true, OsRng).unwrap();
+    memsovereign::init_keys(home, true, &mut memsovereign::os_rng()).unwrap();
 
     #[cfg(unix)]
     {
@@ -22,6 +21,12 @@ fn init_creates_keys_and_refuses_overwrite_without_force() {
         let secret = home.join("keys/identity_ed25519");
         let mode = std::fs::metadata(&secret).unwrap().permissions().mode() & 0o777;
         assert_eq!(mode, 0o600);
+        let dir_mode = std::fs::metadata(home.join("keys"))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777;
+        assert_eq!(dir_mode, 0o700);
     }
 }
 
@@ -30,17 +35,17 @@ fn minimal_end_to_end_init_append_verify_chain_and_detect_tamper() {
     let td = tempfile::tempdir().unwrap();
     let home = td.path();
 
-    memsovereign::init_keys(home, false, OsRng).unwrap();
+    memsovereign::init_keys(home, false, &mut memsovereign::os_rng()).unwrap();
+    memsovereign::verify::verify_chain(home).unwrap();
 
     let prov = Provenance {
         source_type: Some("test".into()),
         ..Default::default()
     };
-    let (_e1, r1) =
-        memsovereign::append_entry(home, "hello", prov.clone(), Vec::new(), OsRng).unwrap();
+    let (_e1, r1) = memsovereign::append_entry(home, "hello", prov.clone(), Vec::new()).unwrap();
     memsovereign::verify::verify_receipt(&r1).unwrap();
 
-    let (_e2, r2) = memsovereign::append_entry(home, "world", prov, Vec::new(), OsRng).unwrap();
+    let (_e2, r2) = memsovereign::append_entry(home, "world", prov, Vec::new()).unwrap();
     memsovereign::verify::verify_receipt(&r2).unwrap();
 
     memsovereign::verify::verify_chain(home).unwrap();

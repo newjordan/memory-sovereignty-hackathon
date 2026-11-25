@@ -1,12 +1,11 @@
 use memsovereign::types::{Attachment, Provenance};
-use rand_core::OsRng;
 
 #[test]
 fn verify_chain_detects_tampered_attachment_metadata() {
     let td = tempfile::tempdir().unwrap();
     let home = td.path();
 
-    memsovereign::init_keys(home, false, OsRng).unwrap();
+    memsovereign::init_keys(home, false, &mut memsovereign::os_rng()).unwrap();
 
     // Create a small file and attach it.
     let p = home.join("sample.txt");
@@ -33,7 +32,6 @@ fn verify_chain_detects_tampered_attachment_metadata() {
         "entry with attachment",
         Provenance::default(),
         attachments,
-        OsRng,
     )
     .unwrap();
 

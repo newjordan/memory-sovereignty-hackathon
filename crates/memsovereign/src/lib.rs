@@ -7,9 +7,10 @@ pub mod store;
 pub mod types;
 pub mod verify;
 
+pub use crypto::os_rng;
 pub use keys::{IdentityKeys, StoredKeys};
 pub use store::{
     append_entry, checkpoint_path, create_checkpoint, head_state, init_keys, load_keys,
-    load_receipt, save_receipt,
+    load_receipt, open_entry, read_entries, save_receipt,
 };
-pub use types::{Checkpoint, Entry, Receipt};
+pub use types::{Attachment, Checkpoint, Entry, LogHead, Provenance, Receipt};

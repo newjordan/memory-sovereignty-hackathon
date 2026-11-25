@@ -2,7 +2,7 @@ use anyhow::Context;
 use clap::{Parser, Subcommand};
 use memsovereign::paths;
 use memsovereign::types::{Attachment, Provenance};
-use rand_core::OsRng;
+use serde::Serialize;
 use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
@@ -59,6 +59,12 @@ enum Command {
         attach_ref: Vec<String>,
     },
 
+    /// Print decrypted entries after the chain verifies.
+    Show {
+        /// Entry index. Omit to print every entry.
+        index: Option<u64>,
+    },
+
     /// Verify the full hash chain in the local log
     VerifyChain,
 
@@ -108,13 +114,22 @@ enum ReceiptCommand {
     },
 }
 
+#[derive(Serialize)]
+struct ShownEntry {
+    index: u64,
+    created_at: String,
+    provenance: Provenance,
+    attachments: Vec<Attachment>,
+    plaintext: String,
+}
+
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let home = paths::resolve_home(cli.home.as_deref())?;
 
     match cli.cmd {
         Command::Init { force } => {
-            let res = memsovereign::init_keys(&home, force, OsRng)
+            let res = memsovereign::init_keys(&home, force, &mut memsovereign::os_rng())
                 .with_context(|| format!("init in {:?}", home))?;
             eprintln!("Initialized memsovereign at {:?}", res.home);
             eprintln!("Public key fingerprint: {}", res.pubkey_fingerprint);
@@ -192,8 +207,7 @@ fn main() -> anyhow::Result<()> {
                 });
             }
 
-            let (_entry, receipt) =
-                memsovereign::append_entry(&home, &content, prov, attachments, OsRng)?;
+            let (_entry, receipt) = memsovereign::append_entry(&home, &content, prov, attachments)?;
 
             if let Some(out) = receipt_out {
                 let json = serde_json::to_vec_pretty(&receipt)?;
@@ -201,6 +215,34 @@ fn main() -> anyhow::Result<()> {
             }
 
             println!("{}", serde_json::to_string_pretty(&receipt)?);
+        }
+        Command::Show { index } => {
+            memsovereign::verify::verify_chain(&home)?;
+            let keys = memsovereign::load_keys(&home)?;
+            let entries = memsovereign::read_entries(&home)?;
+            if let Some(wanted) = index {
+                if !entries.iter().any(|entry| entry.index == wanted) {
+                    anyhow::bail!("no entry at index {wanted}");
+                }
+            }
+            let mut shown = Vec::new();
+            for entry in entries
+                .iter()
+                .filter(|entry| index.is_none_or(|wanted| entry.index == wanted))
+            {
+                let plaintext = memsovereign::open_entry(&keys.content_key, entry)
+                    .with_context(|| format!("decrypt entry {}", entry.index))?;
+                let plaintext = String::from_utf8(plaintext)
+                    .with_context(|| format!("entry {} plaintext is not utf-8", entry.index))?;
+                shown.push(ShownEntry {
+                    index: entry.index,
+                    created_at: entry.created_at.clone(),
+                    provenance: entry.provenance.clone(),
+                    attachments: entry.attachments.clone(),
+                    plaintext,
+                });
+            }
+            println!("{}", serde_json::to_string_pretty(&shown)?);
         }
         Command::VerifyChain => {
             memsovereign::verify::verify_chain(&home)?;
@@ -233,8 +275,7 @@ fn main() -> anyhow::Result<()> {
             let bytes = std::fs::read_to_string(&path).with_context(|| format!("read {path:?}"))?;
             let receipt: memsovereign::Receipt =
                 serde_json::from_str(&bytes).context("parse receipt")?;
-            memsovereign::verify::verify_receipt(&receipt)?;
-            memsovereign::verify::verify_chain_up_to(&home, Some(receipt.index))?;
+            memsovereign::verify::verify_receipt_against_log(&home, &receipt)?;
             eprintln!("OK");
         }
         Command::Receipt { cmd } => match cmd {
