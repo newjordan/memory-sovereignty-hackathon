@@ -1,16 +1,14 @@
 use memsovereign::types::Provenance;
-use rand_core::OsRng;
 
 #[test]
 fn verify_receipt_rejects_tampered_signature() {
     let td = tempfile::tempdir().unwrap();
     let home = td.path();
 
-    memsovereign::init_keys(home, false, OsRng).unwrap();
+    memsovereign::init_keys(home, false, &mut memsovereign::os_rng()).unwrap();
 
     let (_entry, mut receipt) =
-        memsovereign::append_entry(home, "hello", Provenance::default(), Vec::new(), OsRng)
-            .unwrap();
+        memsovereign::append_entry(home, "hello", Provenance::default(), Vec::new()).unwrap();
     memsovereign::verify::verify_receipt(&receipt).unwrap();
 
     // Flip one bit of the signature.

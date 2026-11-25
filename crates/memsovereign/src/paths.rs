@@ -29,6 +29,14 @@ pub fn entries_path(home: &Path) -> PathBuf {
     log_dir(home).join("entries.jsonl")
 }
 
+pub fn head_path(home: &Path) -> PathBuf {
+    log_dir(home).join("HEAD.json")
+}
+
+pub fn lock_path(home: &Path) -> PathBuf {
+    log_dir(home).join("LOCK")
+}
+
 pub fn receipts_dir(home: &Path) -> PathBuf {
     log_dir(home).join("receipts")
 }
